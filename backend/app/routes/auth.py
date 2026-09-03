@@ -75,7 +75,7 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
 def create_guest_session(db: Session = Depends(get_db)):
     """Creates an instant ephemeral guest session without requiring registration."""
     guest_uuid = uuid.uuid4().hex[:8]
-    guest_email = f"guest_{guest_uuid}@vizzle.local"
+    guest_email = f"guest_{guest_uuid}@vizzle.ai"
     
     user = User(
         email=guest_email,
