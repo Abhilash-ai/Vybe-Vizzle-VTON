@@ -15,10 +15,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, experim
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
             <div className="font-bold text-gray-900 tracking-tight text-base font-mono">
-              VIZZLE
+              VYBE
             </div>
             <div className="text-xs text-gray-500 hidden sm:block">
-              / Virtual Try-On Model Evaluation Workbench
+              / Vizzle × Virtual Try-On Benchmarking Engine
             </div>
           </div>
 

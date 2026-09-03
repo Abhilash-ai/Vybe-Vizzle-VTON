@@ -213,10 +213,10 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
       {/* Header */}
       <div className="border-b border-gray-200 pb-4">
         <h1 className="text-xl font-bold text-gray-900 font-mono tracking-tight">
-          VIZZLE
+          VYBE
         </h1>
         <h2 className="text-base font-semibold text-gray-800">
-          Virtual Try-On Model Evaluation
+          Vizzle × Virtual Try-On Benchmarking Engine
         </h2>
         <p className="text-xs text-gray-500 mt-1">
           Evaluate VTON models across clothing categories for accuracy, speed and cost.
