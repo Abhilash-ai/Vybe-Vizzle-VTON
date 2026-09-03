@@ -1,0 +1,11 @@
+test_id,category,person_image,garment_image,garment_name,description
+TEST-01,Saree,/data/samples/models/model_maya.jpg,/data/samples/garments/garm_royal_saree.jpg,Royal Crimson Banarasi Silk Saree,Handwoven pure katan silk saree with gold zari border
+TEST-02,Kurti,/data/samples/models/model_maya.jpg,/data/samples/garments/garm_linen_kurta.jpg,Ivory Chikankari Embroidered Kurti,Handcrafted breathable linen kurti with tone-on-tone Lucknowi embroidery
+TEST-03,Lehenga,/data/samples/models/model_zara.jpg,/data/samples/garments/garm_emerald_dress.jpg,Emerald Embroidered Velvet Lehenga,Traditional flared ethnic lehenga with heavy border work
+TEST-04,Top,/data/samples/models/model_elena.jpg,/data/samples/garments/garm_silk_shirt.jpg,Silk Wrap Top,Fluid champagne silk top with tailored neckline
+TEST-05,T-shirt,/data/samples/models/model_kai.jpg,/data/samples/garments/garm_minimal_tee.jpg,Heavyweight Boxy Graphic T-shirt,280 GSM combed cotton crewneck tee
+TEST-06,Jumpsuit,/data/samples/models/model_maya.jpg,/data/samples/garments/garm_emerald_dress.jpg,Structured Tailored Jumpsuit,Full-body one-piece tailored wide-leg jumpsuit
+TEST-07,Coat,/data/samples/models/model_leo.jpg,/data/samples/garments/garm_leather_jacket.jpg,Double-Breasted Wool Overcoat,Structured heavy winter trench coat
+TEST-08,Shirt,/data/samples/models/model_leo.jpg,/data/samples/garments/garm_silk_shirt.jpg,Champagne Silk Cuban Collar Shirt,Structured collar button-up shirt
+TEST-09,Jeans,/data/samples/models/model_kai.jpg,/data/samples/garments/garm_denim_jacket.jpg,Straight-Fit Selvedge Denim Jeans,14oz vintage washed straight-leg denim
+TEST-10,Trousers,/data/samples/models/model_leo.jpg,/data/samples/garments/garm_tailored_pants.jpg,Pleated Charcoal Wool Trousers,Italian tailored double-pleated wool trousers
