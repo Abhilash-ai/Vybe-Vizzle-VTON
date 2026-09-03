@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { SAMPLE_MODELS, SAMPLE_GARMENTS } from '../services/sampleData';
 import type { ExperimentResponse, ProviderStatusInfo } from '../types';
 
 const REQUIRED_CATEGORIES = [
@@ -20,41 +19,41 @@ interface TestPageProps {
 }
 
 export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
-  // Input selections
-  const [selectedPersonUrl, setSelectedPersonUrl] = useState<string>(SAMPLE_MODELS[0].image_url);
-  const [selectedGarmentUrl, setSelectedGarmentUrl] = useState<string>(SAMPLE_GARMENTS[4].image_url);
-  const [garmentName, setGarmentName] = useState<string>(SAMPLE_GARMENTS[4].name);
-  const [selectedCategory, setSelectedCategory] = useState<string>('Saree');
-  const [selectedModel, setSelectedModel] = useState<string>('CatVTON');
+  // Input selections start EMPTY
+  const [personImageUrl, setPersonImageUrl] = useState<string | null>(null);
+  const [garmentImageUrl, setGarmentImageUrl] = useState<string | null>(null);
+  const [garmentName, setGarmentName] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('');
 
-  // Provider configuration check
+  // Providers list
   const [providers, setProviders] = useState<ProviderStatusInfo[]>([]);
 
-  // Inference state
+  // Execution state
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [currentExp, setCurrentExp] = useState<ExperimentResponse | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
 
-  // Human evaluation rubric (0 to 4 scale, unassigned initially)
-  const [fit, setFit] = useState<number>(3);
-  const [drape, setDrape] = useState<number>(3);
-  const [texture, setTexture] = useState<number>(3);
-  const [pose, setPose] = useState<number>(3);
-  const [body, setBody] = useState<number>(3);
-  const [face, setFace] = useState<number>(3);
-  const [artifacts, setArtifacts] = useState<number>(3);
+  // Human evaluation scores (0 to 4 scale, start UNSELECTED/null)
+  const [fit, setFit] = useState<number | null>(null);
+  const [drape, setDrape] = useState<number | null>(null);
+  const [texture, setTexture] = useState<number | null>(null);
+  const [pose, setPose] = useState<number | null>(null);
+  const [body, setBody] = useState<number | null>(null);
+  const [face, setFace] = useState<number | null>(null);
+  const [artifacts, setArtifacts] = useState<number | null>(null);
   const [notes, setNotes] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/v1/eval/providers')
+    fetch('http://localhost:8000/api/v1/eval/providers', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => setProviders(data))
       .catch((err) => console.error(err));
   }, []);
 
-  const handlePersonFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePersonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const formData = new FormData();
       formData.append('file', e.target.files[0]);
@@ -64,26 +63,26 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
           body: formData
         });
         const json = await res.json();
-        setSelectedPersonUrl(json.url);
+        setPersonImageUrl(json.url);
       } catch (err) {
         console.error(err);
       }
     }
   };
 
-  const handleGarmentFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGarmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const formData = new FormData();
       formData.append('file', e.target.files[0]);
-      formData.append('name', 'Uploaded Garment');
-      formData.append('category', selectedCategory.toLowerCase());
+      formData.append('name', e.target.files[0].name.replace(/\.[^/.]+$/, ''));
+      formData.append('category', selectedCategory ? selectedCategory.toLowerCase() : 'other');
       try {
         const res = await fetch('http://localhost:8000/api/v1/garments/upload', {
           method: 'POST',
           body: formData
         });
         const json = await res.json();
-        setSelectedGarmentUrl(json.image_url);
+        setGarmentImageUrl(json.image_url);
         setGarmentName(json.name);
       } catch (err) {
         console.error(err);
@@ -92,6 +91,23 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
   };
 
   const handleRunTryOn = async () => {
+    if (!personImageUrl) {
+      alert('Please upload a person image first.');
+      return;
+    }
+    if (!garmentImageUrl) {
+      alert('Please upload a garment image first.');
+      return;
+    }
+    if (!selectedCategory) {
+      alert('Please select one of the 10 clothing categories.');
+      return;
+    }
+    if (!selectedModel) {
+      alert('Please select a VTON model candidate.');
+      return;
+    }
+
     setIsRunning(true);
     setExecutionError(null);
     setSaveMessage(null);
@@ -103,26 +119,34 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
         body: JSON.stringify({
           model_name: selectedModel,
           category: selectedCategory,
-          person_image_url: selectedPersonUrl,
-          garment_image_url: selectedGarmentUrl,
-          garment_name: garmentName,
-          is_optimized: selectedModel.includes('Optimized'),
-          optimization_technique: selectedModel.includes('Optimized')
-            ? 'Adaptive Full-Body Mask Dilation & Collar Preservation'
-            : undefined
+          person_image_url: personImageUrl,
+          garment_image_url: garmentImageUrl,
+          garment_name: garmentName || `${selectedCategory} Apparel`,
+          is_optimized: selectedModel.includes('Optimized')
         })
       });
 
       if (!res.ok) {
         const errJson = await res.json();
-        throw new Error(errJson.detail || 'Inference failed');
+        throw new Error(errJson.detail || 'Inference execution failed');
       }
 
       const expData: ExperimentResponse = await res.json();
       setCurrentExp(expData);
+
+      // Reset rubric scores to unselected state
+      setFit(null);
+      setDrape(null);
+      setTexture(null);
+      setPose(null);
+      setBody(null);
+      setFace(null);
+      setArtifacts(null);
+      setNotes('');
+
       onExperimentSaved();
     } catch (err: any) {
-      setExecutionError(err.message || 'Execution error');
+      setExecutionError(err.message || 'Model execution error');
       console.error(err);
     } finally {
       setIsRunning(false);
@@ -131,6 +155,20 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
 
   const handleSaveEvaluation = async () => {
     if (!currentExp) return;
+
+    if (
+      fit === null ||
+      drape === null ||
+      texture === null ||
+      pose === null ||
+      body === null ||
+      face === null ||
+      artifacts === null
+    ) {
+      alert('Please select a score (0 to 4) for all 7 evaluation rubric dimensions.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`http://localhost:8000/api/v1/eval/experiments/${currentExp.id}/score`, {
@@ -147,6 +185,7 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
           evaluator_notes: notes
         })
       });
+
       const updated: ExperimentResponse = await res.json();
       setCurrentExp(updated);
       setSaveMessage('Experiment evaluation successfully saved to database.');
@@ -160,23 +199,23 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
   };
 
   const rubricDimensions = [
-    { label: 'Fit', value: fit, setter: setFit, desc: 'Anatomical fitting to model body' },
-    { label: 'Drape', value: drape, setter: setDrape, desc: 'Natural garment flow, folds & gravity fall' },
-    { label: 'Texture fidelity', value: texture, setter: setTexture, desc: 'Preservation of fabric material, weave & patterns' },
-    { label: 'Pose preservation', value: pose, setter: setPose, desc: 'Model posture & limb orientation consistency' },
-    { label: 'Body preservation', value: body, setter: setBody, desc: 'Natural body proportions & silhouette contour' },
-    { label: 'Face preservation', value: face, setter: setFace, desc: 'Model facial identity, head & skin tone alignment' },
-    { label: 'Artifacts', value: artifacts, setter: setArtifacts, desc: 'Quality (4 = Zero artifacts, 0 = Severe distortion)' }
+    { label: 'Fit', value: fit, setter: setFit },
+    { label: 'Drape', value: drape, setter: setDrape },
+    { label: 'Texture fidelity', value: texture, setter: setTexture },
+    { label: 'Pose preservation', value: pose, setter: setPose },
+    { label: 'Body preservation', value: body, setter: setBody },
+    { label: 'Face preservation', value: face, setter: setFace },
+    { label: 'Artifacts', value: artifacts, setter: setArtifacts }
   ];
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
+    <div className="max-w-3xl mx-auto py-8 px-4 space-y-8 font-sans">
       {/* Header */}
       <div className="border-b border-gray-200 pb-4">
         <h1 className="text-xl font-bold text-gray-900 font-mono tracking-tight">
           VIZZLE
         </h1>
-        <h2 className="text-lg font-semibold text-gray-800">
+        <h2 className="text-base font-semibold text-gray-800">
           Virtual Try-On Model Evaluation
         </h2>
         <p className="text-xs text-gray-500 mt-1">
@@ -184,105 +223,66 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
         </p>
       </div>
 
-      {/* Primary Test Input Form */}
+      {/* Two-Column Input Form */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6 shadow-sm">
-        {/* Two-Column Upload / Select Area */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left: Person Image */}
           <div className="space-y-3">
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider font-mono">
+            <label className="block text-xs font-bold text-gray-700 uppercase font-mono">
               Person Image
             </label>
 
-            <div className="flex gap-2">
-              <label className="cursor-pointer px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300">
-                Upload Person Image
-                <input type="file" accept="image/*" className="hidden" onChange={handlePersonFileUpload} />
+            <div>
+              <label className="cursor-pointer inline-block px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300">
+                [ Upload Person Image ]
+                <input type="file" accept="image/*" className="hidden" onChange={handlePersonUpload} />
               </label>
-
-              <select
-                value={selectedPersonUrl}
-                onChange={(e) => setSelectedPersonUrl(e.target.value)}
-                className="flex-1 text-xs rounded border border-gray-300 px-2 py-1"
-              >
-                {SAMPLE_MODELS.map((m) => (
-                  <option key={m.id} value={m.image_url}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
             </div>
 
-            {/* Preview */}
-            <div className="w-full aspect-[3/4] max-h-72 bg-gray-50 border border-gray-200 rounded overflow-hidden flex items-center justify-center">
-              {selectedPersonUrl ? (
-                <img src={selectedPersonUrl} alt="Person Input" className="w-full h-full object-contain" />
+            <div className="w-full aspect-[3/4] max-h-64 bg-gray-50 border border-dashed border-gray-300 rounded overflow-hidden flex items-center justify-center p-2">
+              {personImageUrl ? (
+                <img src={personImageUrl} alt="Uploaded Person" className="w-full h-full object-contain" />
               ) : (
-                <span className="text-xs text-gray-400">No person image selected</span>
+                <span className="text-xs text-gray-400">No person image uploaded</span>
               )}
             </div>
           </div>
 
           {/* Right: Garment Image */}
           <div className="space-y-3">
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider font-mono">
+            <label className="block text-xs font-bold text-gray-700 uppercase font-mono">
               Garment Image
             </label>
 
-            <div className="flex gap-2">
-              <label className="cursor-pointer px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300">
-                Upload Garment Image
-                <input type="file" accept="image/*" className="hidden" onChange={handleGarmentFileUpload} />
+            <div>
+              <label className="cursor-pointer inline-block px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded border border-gray-300">
+                [ Upload Garment Image ]
+                <input type="file" accept="image/*" className="hidden" onChange={handleGarmentUpload} />
               </label>
-
-              <select
-                value={selectedGarmentUrl}
-                onChange={(e) => {
-                  const url = e.target.value;
-                  setSelectedGarmentUrl(url);
-                  const g = SAMPLE_GARMENTS.find((item) => item.image_url === url);
-                  if (g) setGarmentName(g.name);
-                }}
-                className="flex-1 text-xs rounded border border-gray-300 px-2 py-1"
-              >
-                {SAMPLE_GARMENTS.map((g) => (
-                  <option key={g.id} value={g.image_url}>
-                    {g.name} ({g.category})
-                  </option>
-                ))}
-              </select>
             </div>
 
-            {/* Preview */}
-            <div className="w-full aspect-[3/4] max-h-72 bg-gray-50 border border-gray-200 rounded overflow-hidden flex items-center justify-center p-2">
-              {selectedGarmentUrl ? (
-                <img src={selectedGarmentUrl} alt="Garment Input" className="w-full h-full object-contain" />
+            <div className="w-full aspect-[3/4] max-h-64 bg-gray-50 border border-dashed border-gray-300 rounded overflow-hidden flex items-center justify-center p-2">
+              {garmentImageUrl ? (
+                <img src={garmentImageUrl} alt="Uploaded Garment" className="w-full h-full object-contain" />
               ) : (
-                <span className="text-xs text-gray-400">No garment image selected</span>
+                <span className="text-xs text-gray-400">No garment image uploaded</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Category and Model Selectors */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+        {/* Category & Model Selectors */}
+        <div className="space-y-4 pt-4 border-t border-gray-200">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase font-mono mb-1">
-              Garment Category (10 Mandated)
+              Garment Category
             </label>
             <select
               value={selectedCategory}
-              onChange={(e) => {
-                const cat = e.target.value;
-                setSelectedCategory(cat);
-                const match = SAMPLE_GARMENTS.find((g) => g.category.toLowerCase() === cat.toLowerCase());
-                if (match) {
-                  setSelectedGarmentUrl(match.image_url);
-                  setGarmentName(match.name);
-                }
-              }}
-              className="w-full text-xs font-semibold rounded border border-gray-300 p-2"
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full text-xs rounded border border-gray-300 p-2 font-mono"
             >
+              <option value="">-- Select Category (10 Mandated) --</option>
               {REQUIRED_CATEGORIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -293,123 +293,98 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
 
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase font-mono mb-1">
-              VTON Model Candidate
+              VTON Model
             </label>
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full text-xs font-mono rounded border border-gray-300 p-2"
+              className="w-full text-xs rounded border border-gray-300 p-2 font-mono"
             >
-              <option value="CatVTON">CatVTON (Apache 2.0 · Self-Hosted GPU)</option>
-              <option value="IDM-VTON (Baseline)">IDM-VTON Baseline (CC-BY-NC-SA 4.0)</option>
-              <option value="IDM-VTON (Optimized)">IDM-VTON Optimized (Adaptive Mask Dilation)</option>
-              <option value="OOTDiffusion">OOTDiffusion (OpenRAIL-M · Cloud Serverless)</option>
-              <option value="FASHN API (Commercial)">FASHN API (Commercial Cloud API)</option>
-              <option value="Local Baseline (CPU)">Local Baseline (CPU Offline Test Harness)</option>
+              <option value="">-- Select VTON Model Candidate --</option>
+              {providers.map((p) => (
+                <option key={p.model_name} value={p.model_name}>
+                  {p.model_name} {p.status !== 'READY' ? `(${p.status})` : ''}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
         {/* Run Button */}
-        <div className="pt-2">
+        <div>
           <button
             onClick={handleRunTryOn}
             disabled={isRunning}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold text-sm uppercase tracking-wider rounded transition-colors font-mono"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold text-xs uppercase tracking-wider rounded font-mono transition-colors"
           >
-            {isRunning ? 'RUNNING INFERENCE & MEASURING TIMING...' : 'RUN VIRTUAL TRY-ON'}
+            {isRunning ? 'RUNNING INFERENCE & MEASURING TIMER...' : 'RUN VIRTUAL TRY-ON'}
           </button>
         </div>
 
         {executionError && (
           <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-mono rounded">
-            Error: {executionError}
+            <strong>Inference Unavailable:</strong> {executionError}
           </div>
         )}
       </div>
 
-      {/* Result Area */}
+      {/* Result Area (Appears ONLY after real execution) */}
       {currentExp && (
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6 shadow-sm">
-          <div className="border-b border-gray-200 pb-3">
-            <h3 className="text-sm font-bold text-gray-900 uppercase font-mono tracking-wider">
+          <div className="border-b border-gray-200 pb-2">
+            <h3 className="text-sm font-bold text-gray-900 uppercase font-mono">
               Result
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            {/* Generated Image */}
-            <div className="w-full aspect-[3/4] max-h-96 bg-gray-100 border border-gray-300 rounded overflow-hidden flex items-center justify-center">
+            <div className="w-full aspect-[3/4] max-h-80 bg-gray-100 border border-gray-300 rounded overflow-hidden flex items-center justify-center">
               <img
-                src={currentExp.result_image_url || currentExp.person_image_path}
+                src={currentExp.result_image_url || ''}
                 alt="Generated VTON Result"
                 className="w-full h-full object-contain"
               />
             </div>
 
-            {/* Execution Metadata */}
-            <div className="space-y-4 text-xs font-mono">
-              <div className="bg-gray-50 border border-gray-200 rounded p-4 space-y-2">
-                <div className="flex justify-between border-b border-gray-200 pb-1">
-                  <span className="text-gray-500 font-semibold">Model:</span>
-                  <span className="font-bold text-gray-900">{currentExp.model_name}</span>
-                </div>
-
-                <div className="flex justify-between border-b border-gray-200 pb-1">
-                  <span className="text-gray-500 font-semibold">Category:</span>
-                  <span className="font-bold text-gray-900">{currentExp.category}</span>
-                </div>
-
-                <div className="flex justify-between border-b border-gray-200 pb-1">
-                  <span className="text-gray-500 font-semibold">Generation time:</span>
-                  <span className="font-bold text-blue-700">
-                    {currentExp.generation_time_sec.toFixed(3)} seconds
-                  </span>
-                </div>
-
-                <div className="flex justify-between border-b border-gray-200 pb-1">
-                  <span className="text-gray-500 font-semibold">Cost:</span>
-                  <span className="font-bold text-gray-900">
-                    ₹{currentExp.cost_inr.toFixed(2)} INR ({currentExp.cost_type})
-                  </span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-gray-500 font-semibold">Status:</span>
-                  <span className={`font-bold uppercase ${
-                    currentExp.generation_status === 'completed' ? 'text-green-700' : 'text-red-700'
-                  }`}>
-                    {currentExp.generation_status === 'completed' ? 'Success' : 'Failed'}
-                  </span>
-                </div>
+            <div className="space-y-3 text-xs font-mono bg-gray-50 p-4 border border-gray-200 rounded">
+              <div>
+                <span className="text-gray-500">Model: </span>
+                <span className="font-bold text-gray-900">{currentExp.model_name}</span>
               </div>
 
-              <div className="text-[11px] text-gray-500">
-                Experiment ID: <span className="font-mono text-gray-700">{currentExp.id}</span>
+              <div>
+                <span className="text-gray-500">Category: </span>
+                <span className="font-bold text-gray-900">{currentExp.category}</span>
+              </div>
+
+              <div>
+                <span className="text-gray-500">Generation time: </span>
+                <span className="font-bold text-blue-700">{currentExp.generation_time_sec.toFixed(3)} seconds</span>
+              </div>
+
+              <div>
+                <span className="text-gray-500">Cost: </span>
+                <span className="font-bold text-gray-900">₹{currentExp.cost_inr.toFixed(2)} INR ({currentExp.cost_type})</span>
+              </div>
+
+              <div>
+                <span className="text-gray-500">Status: </span>
+                <span className="font-bold uppercase text-green-700">{currentExp.generation_status}</span>
               </div>
             </div>
           </div>
 
-          {/* Human Accuracy Evaluation Form */}
+          {/* Evaluation Scoring Form */}
           <div className="border-t border-gray-200 pt-6 space-y-4">
-            <div>
-              <h4 className="text-xs font-bold text-gray-900 uppercase font-mono tracking-wider">
-                Evaluation (Human Evaluator Rubric)
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 font-mono">
-                Scale: 0 = Failed, 1 = Poor, 2 = Acceptable, 3 = Good, 4 = Excellent
-              </p>
-            </div>
+            <h4 className="text-xs font-bold text-gray-900 uppercase font-mono">
+              Evaluation (Human Score Required)
+            </h4>
 
-            <div className="space-y-3 font-mono text-xs">
+            <div className="space-y-2 font-mono text-xs">
               {rubricDimensions.map((dim) => (
-                <div key={dim.label} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded bg-gray-50 border border-gray-200">
-                  <div>
-                    <span className="font-bold text-gray-800">{dim.label}</span>
-                    <span className="text-[10px] text-gray-400 block sm:inline sm:ml-2">({dim.desc})</span>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
+                <div key={dim.label} className="flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-200">
+                  <span className="font-semibold text-gray-800">{dim.label}</span>
+                  <div className="flex space-x-3">
                     {[0, 1, 2, 3, 4].map((num) => (
                       <label key={num} className="inline-flex items-center space-x-1 cursor-pointer">
                         <input
@@ -420,7 +395,7 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
                           onChange={() => dim.setter(num)}
                           className="text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-xs font-bold">{num}</span>
+                        <span className="text-xs">{num}</span>
                       </label>
                     ))}
                   </div>
@@ -436,7 +411,7 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Observed fit quality, drape distortions, pallu truncation, or boundary artifacts..."
+                placeholder="Observed fit quality, drape distortions, or boundary artifacts..."
                 className="w-full text-xs font-mono rounded border border-gray-300 p-2"
               />
             </div>
@@ -445,7 +420,7 @@ export const TestPage: React.FC<TestPageProps> = ({ onExperimentSaved }) => {
               <button
                 onClick={handleSaveEvaluation}
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-bold font-mono uppercase rounded transition-colors"
+                className="px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-xs font-bold font-mono uppercase rounded"
               >
                 {isSaving ? 'SAVING...' : 'SAVE EXPERIMENT'}
               </button>

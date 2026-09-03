@@ -16,7 +16,7 @@ from ..schemas.experiment import (
     DatasetValidationResponse,
     ProviderStatusInfo
 )
-from ..services.evaluation_service import eval_service, REQUIRED_CATEGORIES, CANDIDATE_MODELS
+from ..services.evaluation_service import eval_service, REQUIRED_CATEGORIES
 
 router = APIRouter(prefix="/eval", tags=["Model Evaluation Engine"])
 
