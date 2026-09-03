@@ -166,58 +166,104 @@ export interface CategoryInfo {
 
 export interface ExperimentResponse {
   id: string;
-  created_at: string;
+  timestamp: string;
   model_name: string;
-  provider: string;
+  provider_type: string;
+  provider_status: string;
   category: string;
-  person_image_url: string;
-  garment_image_url: string;
+  person_image_path: string;
+  garment_image_path: string;
   garment_name?: string;
   result_image_url?: string;
-  status: string;
+  generation_status: string;
   error_message?: string;
+  duration_ms: number;
   generation_time_sec: number;
   cost_inr: number;
+  cost_type: string;
+  cost_calculation_basis?: string;
   meets_time_req: boolean;
   meets_cost_req: boolean;
-  fit_score?: number;
-  drape_score?: number;
-  texture_score?: number;
-  artifact_score?: number;
-  face_score?: number;
-  body_score?: number;
-  overall_score?: number;
-  meets_accuracy_req?: boolean;
+  fit_score?: number | null;
+  drape_score?: number | null;
+  texture_score?: number | null;
+  pose_preservation_score?: number | null;
+  body_preservation_score?: number | null;
+  face_preservation_score?: number | null;
+  artifact_score?: number | null;
+  overall_score?: number | null;
+  is_evaluated: boolean;
+  evaluator_notes?: string | null;
   is_optimized: boolean;
-  optimization_technique?: string;
-  notes?: string;
+  optimization_technique?: string | null;
 }
 
-export interface MatrixCell {
+export interface MatrixCellResponse {
   model_name: string;
   category: string;
   experiment_id?: string;
   generation_time_sec?: number;
   cost_inr?: number;
-  accuracy_score?: number;
+  cost_type?: string;
+  accuracy_score?: number | null;
   meets_all_reqs?: boolean;
   result_image_url?: string;
+  is_evaluated: boolean;
   tested: boolean;
+}
+
+export interface SummaryRankingItem {
+  model: string;
+  tests_completed: number;
+  avg_accuracy_score?: number | null;
+  avg_generation_time_sec?: number | null;
+  avg_cost_inr?: number | null;
+  cost_type: string;
+  categories_passed: string;
+  passed_count: number;
+  license: string;
+  meets_time_constraint: boolean;
+  meets_cost_constraint: boolean;
+  production_verdict: string;
 }
 
 export interface BenchmarkMatrixResponse {
   categories: string[];
   models: string[];
-  matrix: Record<string, Record<string, MatrixCell>>;
-  summary_rankings: Array<{
-    model: string;
-    avg_accuracy_score: number;
-    avg_generation_time_sec: number;
-    cost_per_gen_inr: number;
-    categories_passed: string;
-    license: string;
-    meets_time_constraint: boolean;
-    meets_cost_constraint: boolean;
-    recommendation_status: string;
-  }>;
+  total_experiments_recorded: number;
+  matrix: Record<string, Record<string, MatrixCellResponse>>;
+  summary_rankings: SummaryRankingItem[];
+  has_data: boolean;
+}
+
+export interface ManifestValidationItem {
+  test_id: string;
+  category: string;
+  person_image: string;
+  garment_image: string;
+  garment_name: string;
+  description: string;
+  person_exists: boolean;
+  garment_exists: boolean;
+  is_valid: boolean;
+}
+
+export interface DatasetValidationResponse {
+  total_test_cases: number;
+  valid_test_cases: number;
+  missing_test_cases: number;
+  dataset_status: string;
+  items: ManifestValidationItem[];
+}
+
+export interface ProviderStatusInfo {
+  model_name: string;
+  provider_type: string;
+  status: string;
+  license: string;
+  is_commercial_safe: boolean;
+  architecture: string;
+  pricing_model: string;
+  environment_note: string;
+  experiments_recorded: number;
 }

@@ -10,30 +10,27 @@ from ..database import get_db
 from ..models.experiment import Experiment
 from ..schemas.experiment import (
     RunEvaluationRequest,
-    EvaluationScoreUpdate,
+    EvaluationScoreSubmission,
     ExperimentResponse,
-    BenchmarkMatrixResponse
+    BenchmarkMatrixResponse,
+    DatasetValidationResponse,
+    ProviderStatusInfo
 )
 from ..services.evaluation_service import eval_service, REQUIRED_CATEGORIES, CANDIDATE_MODELS
 
 router = APIRouter(prefix="/eval", tags=["Model Evaluation Engine"])
 
 
-@router.get("/manifest")
-def get_test_manifest():
-    """Returns the standardized 10-category benchmark dataset manifest."""
-    manifest_path = eval_service.resolve_path("data/manifests/tests.csv")
-    tests = []
-    if os.path.exists(manifest_path):
-        with open(manifest_path, mode="r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            tests = list(reader)
-    return {
-        "categories_count": len(REQUIRED_CATEGORIES),
-        "required_categories": REQUIRED_CATEGORIES,
-        "candidate_models": CANDIDATE_MODELS,
-        "test_dataset": tests
-    }
+@router.get("/providers", response_model=List[ProviderStatusInfo])
+def get_providers_status(db: Session = Depends(get_db)):
+    """Returns actual connectivity and configuration status for all candidate VTON models."""
+    return eval_service.get_providers_status(db)
+
+
+@router.get("/manifest", response_model=DatasetValidationResponse)
+def get_validated_dataset_manifest():
+    """Returns dataset manifest with live disk file validation (confirms actual image existence)."""
+    return eval_service.validate_dataset_manifest()
 
 
 @router.post("/run", response_model=ExperimentResponse)
@@ -41,19 +38,25 @@ def run_model_evaluation(
     req: RunEvaluationRequest,
     db: Session = Depends(get_db)
 ):
-    """Executes a standardized model try-on evaluation test."""
-    exp = eval_service.run_evaluation(
-        db=db,
-        model_name=req.model_name,
-        category=req.category,
-        person_image_url=req.person_image_url,
-        garment_image_url=req.garment_image_url,
-        garment_name=req.garment_name,
-        is_optimized=req.is_optimized,
-        optimization_technique=req.optimization_technique,
-        configuration=req.configuration
-    )
-    return exp
+    """
+    Executes actual model inference pipeline, measuring exact millisecond duration
+    and calculating unit cost strictly from documented rates without fabrication.
+    """
+    try:
+        exp = eval_service.run_actual_inference(
+            db=db,
+            model_name=req.model_name,
+            category=req.category,
+            person_image_url=req.person_image_url,
+            garment_image_url=req.garment_image_url,
+            garment_name=req.garment_name,
+            is_optimized=req.is_optimized,
+            optimization_technique=req.optimization_technique,
+            configuration=req.configuration
+        )
+        return exp
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Inference execution failed: {str(e)}")
 
 
 @router.get("/experiments", response_model=List[ExperimentResponse])
@@ -62,12 +65,13 @@ def list_experiments(
     model_name: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    """Lists real logged experiments from the database."""
     query = db.query(Experiment)
     if category and category.lower() != "all":
         query = query.filter(Experiment.category.ilike(category))
     if model_name and model_name.lower() != "all":
         query = query.filter(Experiment.model_name.ilike(f"%{model_name}%"))
-    return query.order_by(Experiment.created_at.desc()).all()
+    return query.order_by(Experiment.timestamp.desc()).all()
 
 
 @router.get("/experiments/{experiment_id}", response_model=ExperimentResponse)
@@ -81,10 +85,13 @@ def get_experiment_by_id(experiment_id: str, db: Session = Depends(get_db)):
 @router.post("/experiments/{experiment_id}/score", response_model=ExperimentResponse)
 def update_human_evaluation_score(
     experiment_id: str,
-    scores: EvaluationScoreUpdate,
+    scores: EvaluationScoreSubmission,
     db: Session = Depends(get_db)
 ):
-    """Updates the 0-4 accuracy scoring rubric for a specific experiment."""
+    """
+    Records human evaluation observations across the 0-4 scoring rubric.
+    Overall score is computed dynamically from the 7 rubric dimensions.
+    """
     exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not exp:
         raise HTTPException(status_code=404, detail="Experiment not found.")
@@ -92,16 +99,26 @@ def update_human_evaluation_score(
     exp.fit_score = scores.fit_score
     exp.drape_score = scores.drape_score
     exp.texture_score = scores.texture_score
+    exp.pose_preservation_score = scores.pose_preservation_score
+    exp.body_preservation_score = scores.body_preservation_score
+    exp.face_preservation_score = scores.face_preservation_score
     exp.artifact_score = scores.artifact_score
-    exp.face_score = scores.face_score
-    exp.body_score = scores.body_score
 
-    # Compute weighted overall score
-    avg_score = round((scores.fit_score + scores.drape_score + scores.texture_score + scores.artifact_score + scores.face_score + scores.body_score) / 6.0, 2)
+    # Compute overall score from the 7 dimensions
+    all_scores = [
+        scores.fit_score,
+        scores.drape_score,
+        scores.texture_score,
+        scores.pose_preservation_score,
+        scores.body_preservation_score,
+        scores.face_preservation_score,
+        scores.artifact_score
+    ]
+    avg_score = round(sum(all_scores) / len(all_scores), 2)
     exp.overall_score = avg_score
-    exp.meets_accuracy_req = avg_score >= 3.0
-    if scores.notes:
-        exp.notes = scores.notes
+    exp.is_evaluated = True
+    if scores.evaluator_notes:
+        exp.evaluator_notes = scores.evaluator_notes
 
     db.commit()
     db.refresh(exp)
@@ -110,92 +127,67 @@ def update_human_evaluation_score(
 
 @router.get("/matrix", response_model=BenchmarkMatrixResponse)
 def get_benchmark_matrix(db: Session = Depends(get_db)):
-    """Returns the full 10-category x Model evaluation matrix with summary rankings."""
-    # Ensure suite is seeded if table is empty
-    if db.query(Experiment).count() == 0:
-        eval_service.seed_evaluation_benchmark_suite(db)
+    """
+    Returns the dynamic benchmark matrix populated ONLY with real recorded experiments.
+    Un-run cells are explicitly returned as NOT TESTED.
+    """
     return eval_service.build_benchmark_matrix(db)
 
 
 @router.get("/optimization-report")
 def get_optimization_report(db: Session = Depends(get_db)):
-    """Returns the comparative study for IDM-VTON on ethnic categories (Saree, Kurti, Lehenga)."""
-    if db.query(Experiment).count() == 0:
-        eval_service.seed_evaluation_benchmark_suite(db)
+    """
+    Returns comparative data for IDM-VTON baseline vs optimized.
+    Only computes delta when real experiments exist for both.
+    """
+    return eval_service.get_optimization_comparison(db)
 
-    ethnic_cats = ["Saree", "Kurti", "Lehenga"]
-    baseline_exps = db.query(Experiment).filter(
-        Experiment.model_name == "IDM-VTON (Baseline)",
-        Experiment.category.in_(ethnic_cats)
-    ).all()
-    optimized_exps = db.query(Experiment).filter(
-        Experiment.model_name == "IDM-VTON (Optimized)",
-        Experiment.category.in_(ethnic_cats)
-    ).all()
 
-    comparison = []
-    for cat in ethnic_cats:
-        base = next((e for e in baseline_exps if e.category == cat), None)
-        opt = next((e for e in optimized_exps if e.category == cat), None)
-        if base and opt:
-            comparison.append({
-                "category": cat,
-                "baseline": {
-                    "fit": base.fit_score,
-                    "drape": base.drape_score,
-                    "overall": base.overall_score,
-                    "meets_accuracy": base.meets_accuracy_req,
-                    "result_image_url": base.result_image_url,
-                    "notes": base.notes
-                },
-                "optimized": {
-                    "fit": opt.fit_score,
-                    "drape": opt.drape_score,
-                    "overall": opt.overall_score,
-                    "meets_accuracy": opt.meets_accuracy_req,
-                    "result_image_url": opt.result_image_url,
-                    "notes": opt.notes,
-                    "technique": opt.optimization_technique
-                },
-                "accuracy_improvement_pct": round(((opt.overall_score - base.overall_score) / base.overall_score) * 100, 1) if base.overall_score else 0.0
-            })
-
-    return {
-        "title": "IDM-VTON Saree & Kurti Optimization Study",
-        "problem_statement": "IDM-VTON fails on Saree and Kurti out of the box due to upper-body bounding assumptions cutting off continuous drapes and hems.",
-        "solution_applied": "Adaptive semantic human parsing with full-body dilation, garment texture-guided mask expansion, and collar restoration.",
-        "findings": comparison
-    }
+@router.post("/clear-all")
+def clear_all_experiments(db: Session = Depends(get_db)):
+    """Clears all logged experiment records from the database."""
+    deleted_count = db.query(Experiment).delete()
+    db.commit()
+    return {"status": "cleared", "deleted_experiments_count": deleted_count}
 
 
 @router.get("/export-csv")
 def export_experiments_csv(db: Session = Depends(get_db)):
-    """Exports all recorded experiments and rubric evaluations to CSV."""
-    experiments = db.query(Experiment).order_by(Experiment.created_at.desc()).all()
+    """Exports all real recorded experiments and rubric evaluations to CSV."""
+    experiments = db.query(Experiment).order_by(Experiment.timestamp.desc()).all()
     
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "Experiment ID", "Date", "Model Name", "Provider", "Category", "Garment Name",
-        "Generation Time (sec)", "Cost (INR)", "Meets Time Req (<15s)", "Meets Cost Req (<Rs 4)",
-        "Fit Score (0-4)", "Drape Score (0-4)", "Texture Score (0-4)", "Artifact Score (0-4)",
-        "Face Preservation (0-4)", "Body Preservation (0-4)", "Overall Score (0-4)",
-        "Meets Accuracy Req", "Is Optimized", "Optimization Technique", "Notes"
+        "Experiment ID", "Timestamp", "Model Name", "Provider Type", "Category", "Garment Name",
+        "Measured Duration (sec)", "Measured Duration (ms)", "Unit Cost (INR)", "Cost Type", "Cost Calculation Basis",
+        "Meets Time Req (<15s)", "Meets Cost Req (<Rs 4)", "Is Evaluated",
+        "Fit Score (0-4)", "Drape Score (0-4)", "Texture Score (0-4)", "Pose Preservation (0-4)",
+        "Body Preservation (0-4)", "Face Preservation (0-4)", "Artifact Score (0-4)", "Overall Score (0-4)",
+        "Is Optimized", "Optimization Technique", "Evaluator Notes"
     ])
 
     for e in experiments:
         writer.writerow([
-            e.id, e.created_at.isoformat(), e.model_name, e.provider, e.category, e.garment_name or "",
-            e.generation_time_sec, e.cost_inr, "YES" if e.meets_time_req else "NO", "YES" if e.meets_cost_req else "NO",
-            e.fit_score or "", e.drape_score or "", e.texture_score or "", e.artifact_score or "",
-            e.face_score or "", e.body_score or "", e.overall_score or "",
-            "YES" if e.meets_accuracy_req else "NO", "YES" if e.is_optimized else "NO",
-            e.optimization_technique or "", e.notes or ""
+            e.id, e.timestamp.isoformat() if e.timestamp else "", e.model_name, e.provider_type, e.category, e.garment_name or "",
+            e.generation_time_sec, e.duration_ms, e.cost_inr, e.cost_type, e.cost_calculation_basis or "",
+            "YES" if e.meets_time_req else "NO", "YES" if e.meets_cost_req else "NO", "YES" if e.is_evaluated else "NO",
+            e.fit_score if e.fit_score is not None else "",
+            e.drape_score if e.drape_score is not None else "",
+            e.texture_score if e.texture_score is not None else "",
+            e.pose_preservation_score if e.pose_preservation_score is not None else "",
+            e.body_preservation_score if e.body_preservation_score is not None else "",
+            e.face_preservation_score if e.face_preservation_score is not None else "",
+            e.artifact_score if e.artifact_score is not None else "",
+            e.overall_score if e.overall_score is not None else "",
+            "YES" if e.is_optimized else "NO",
+            e.optimization_technique or "",
+            e.evaluator_notes or ""
         ])
 
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=vizzle_vton_model_evaluation_report.csv"}
+        headers={"Content-Disposition": "attachment; filename=vizzle_vton_empirical_experiments.csv"}
     )

@@ -46,4 +46,4 @@ def test_guest_session_creation(client):
     data = res.json()
     assert "access_token" in data
     assert data["is_guest"] is True
-    assert "@vizzle.local" in data["user"]["email"]
+    assert "@vizzle.ai" in data["user"]["email"]

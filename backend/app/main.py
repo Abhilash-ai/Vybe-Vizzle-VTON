@@ -8,26 +8,17 @@ from .config import settings, DATA_DIR, UPLOADS_DIR, RESULTS_DIR, SAMPLES_DIR
 from .database import engine, Base, SessionLocal
 from .routes import api_router
 from .utils.sample_generator import generate_sample_assets
-from .services.evaluation_service import eval_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. Initialize database schema
     Base.metadata.create_all(bind=engine)
-    # 2. Seed default sample models and garments
+    # 2. Ensure verified sample model portraits and garments exist on disk
     try:
         generate_sample_assets()
     except Exception as e:
-        print(f"[Warning] Failed to generate sample assets on startup: {e}")
-
-    # 3. Pre-seed benchmark evaluation test matrix
-    try:
-        db = SessionLocal()
-        eval_service.seed_evaluation_benchmark_suite(db)
-        db.close()
-    except Exception as e:
-        print(f"[Warning] Failed to seed evaluation benchmark suite: {e}")
+        print(f"[Warning] Failed to verify sample assets on startup: {e}")
 
     yield
 
