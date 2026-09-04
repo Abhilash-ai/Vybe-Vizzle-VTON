@@ -14,15 +14,7 @@
 - **Commercial Cloud Backup**: **FASHN API** — Zero infrastructure maintenance, **6.5s latency**, **₹3.75 INR/gen (Actual metered API)**.
 - **Disqualified**: **IDM-VTON** — Disqualified from commercial e-commerce deployment due to its **CC-BY-NC-SA 4.0 Non-Commercial License restriction**, regardless of empirical accuracy or optimization.
 
----
 
-## Demo
-
-![VYBE Live Interactive Evaluation Demo](docs/demo.gif)
-
-*Live end-to-end evaluation flow: Upload person photo (`model_maya.jpg` / `model_kai.jpg`) → Upload garment apparel (`garm_royal_saree.jpg`, `garm_minimal_tee.jpg`) → Execute live inference & latency measurement (`0.278s`) → Submit 7-dimension human evaluation rubric → Inspect synchronized SQLite experiment store & category benchmark matrix.*
-
----
 
 ## 1. Objective
 
