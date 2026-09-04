@@ -20,8 +20,7 @@
 
 ![VYBE Live Interactive Evaluation Demo](docs/demo.gif)
 
-- **Direct Walkthrough Video (MP4)**: [docs/demo.mp4](docs/demo.mp4)
-- **Live Flow Demonstrated**: Upload Person Photo (`model_maya.jpg` / `model_kai.jpg`) → Upload Garment Apparel (`garm_royal_saree.jpg`, `garm_minimal_tee.jpg`) → Execute Live Inference & Latency Measurement (`0.278s`) → Submit 7-Dimension Human Evaluation Rubric → Inspect Synchronized SQLite Experiment Store & Category Benchmark Matrix.
+*Live end-to-end evaluation flow: Upload person photo (`model_maya.jpg` / `model_kai.jpg`) → Upload garment apparel (`garm_royal_saree.jpg`, `garm_minimal_tee.jpg`) → Execute live inference & latency measurement (`0.278s`) → Submit 7-dimension human evaluation rubric → Inspect synchronized SQLite experiment store & category benchmark matrix.*
 
 ---
 
