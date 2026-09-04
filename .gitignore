@@ -31,8 +31,10 @@ dist-ssr/
 # Storage uploads (temporary uploaded files during development)
 backend/data/uploads/*
 backend/data/results/*
+!backend/data/results/*.csv
 !backend/data/samples/
 !backend/data/samples/**
+!data/results/*.csv
 
 # OS Files
 .DS_Store
