@@ -115,7 +115,7 @@ $$\text{Overall Score} = \frac{\text{Fit} + \text{Drape} + \text{Texture} + \tex
 | **Saree** (TEST-01) | ![Maya Portrait](docs/samples/model_maya.jpg) | ![Royal Saree](docs/samples/garm_royal_saree.jpg) | ![Saree Result](docs/samples/result_saree.jpg) |
 | **Kurti** (TEST-02) | ![Maya Portrait](docs/samples/model_maya.jpg) | ![Linen Kurti](docs/samples/garm_linen_kurta.jpg) | ![Kurti Result](docs/samples/result_kurti.jpg) |
 | **T-shirt** (TEST-05) | ![Kai Portrait](docs/samples/model_kai.jpg) | ![Minimal Tee](docs/samples/garm_minimal_tee.jpg) | ![Tee Result](docs/samples/result_t-shirt.jpg) |
-| **Coat** (TEST-07) | ![Leo Portrait](docs/samples/model_maya.jpg) | ![Leather Coat](docs/samples/garm_leather_jacket.jpg) | ![Coat Result](docs/samples/result_coat.jpg) |
+| **Coat** (TEST-07) | ![Leo Portrait](docs/samples/model_leo.jpg) | ![Charcoal Coat](docs/samples/garm_leather_jacket.jpg) | ![Coat Result](docs/samples/result_coat.jpg) |
 
 ---
 
