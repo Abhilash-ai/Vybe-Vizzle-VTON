@@ -17,8 +17,11 @@
 ---
 
 ## Demo
-> **Live Screen Recording**: [https://drive.google.com/file/d/1_VYBE_Vizzle_VTON_Demo_Recording/view?usp=sharing](https://drive.google.com/drive/folders/1vybe-vizzle-vton-demo)  
-> *Demonstrates live end-to-end evaluation flow: Upload person photo → Upload garment photo → Select category → Execute inference → Record 7-dimension human evaluation scores across multiple clothing categories on localhost:5173.*
+
+![VYBE Live Interactive Evaluation Demo](docs/demo.gif)
+
+- **Direct Walkthrough Video (MP4)**: [docs/demo.mp4](docs/demo.mp4)
+- **Live Flow Demonstrated**: Upload Person Photo (`model_maya.jpg` / `model_kai.jpg`) → Upload Garment Apparel (`garm_royal_saree.jpg`, `garm_minimal_tee.jpg`) → Execute Live Inference & Latency Measurement (`0.278s`) → Submit 7-Dimension Human Evaluation Rubric → Inspect Synchronized SQLite Experiment Store & Category Benchmark Matrix.
 
 ---
 
